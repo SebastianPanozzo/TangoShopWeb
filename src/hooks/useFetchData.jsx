@@ -10,12 +10,15 @@ function useFetchData(url) {
             throw new Error(`Invalid arguments: ${JSON.stringify(arg)}`);
         }
 
+        // Configurar headers básicos, sin requerir autenticación
+        const requestHeaders = {
+            'Content-Type': 'application/json',
+            ...(headers || {})
+        };
+
         const response = await fetch(`${API_URL}${url}${id || ""}`, {
             method: method,
-            headers: {
-                ...(headers || {}),
-                'Content-Type': 'application/json'
-            },
+            headers: requestHeaders,
             body: JSON.stringify(body),
         });
 

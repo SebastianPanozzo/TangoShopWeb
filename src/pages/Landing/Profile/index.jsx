@@ -1,241 +1,91 @@
-import { useNavigate } from "react-router-dom";
+// ===== COMPONENTE PROFILE =====
+import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect, useRef } from 'react';
 import Loader from "../../../components/LoadAndErr/Loader";
 import Error from "../../../components/LoadAndErr/Error";
-import image from "../../../../public/img/bgHome.webp"
-import useStore from '../../../hooks/useStore';
+import image from "../../../../public/img/bgHeader.jpeg"
 import useFetchData from '../../../hooks/useFetchData';
-import AppointmentList from "../../../components/AppointmentList";
-import { appointmentQuery } from "../../../utiles/querys";
+import ProductList from "../../../components/ProductList";
 
-// Componente Modal interno mejorado
-const EditProfileModal = ({
-  id,
-  title,
-  userData,
-  onClose,
-  onUpdate
-}) => {
+// Modal para solicitar email
+const EmailRequestModal = ({ onEmailSubmit, isVisible }) => {
   const modalRef = useRef();
-  const { trigger: updateTrigger } = useFetchData(`/api/updateUser/${userData._id}`);
-
-  const [formData, setFormData] = useState({
-    name: '',
-    last_name: '',
-    phone: '',
-    image: '',
-    birthdate: ''
-  });
-  const [updateMessage, setUpdateMessage] = useState('');
-
-  // Función para ajustar la fecha con 3 horas adicionales
-  const addThreeHours = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    date.setHours(date.getHours() + 3);
-    return date.toISOString();
-  };
-
-  // Función para formatear fecha para input date (sin ajuste de zona horaria)
-  const formatDateForInput = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toISOString().split('T')[0];
-  };
+  const [email, setEmail] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    if (userData) {
-      setFormData({
-        name: userData.name || '',
-        last_name: userData.last_name || '',
-        phone: userData.phone || '',
-        image: userData.image || '',
-        birthdate: userData.birthdate ? formatDateForInput(userData.birthdate) : ''
+    if (isVisible && modalRef.current) {
+      const modal = new window.bootstrap.Modal(modalRef.current, {
+        backdrop: false, // Elimina el fondo oscuro completamente
+        keyboard: false
       });
+      modal.show();
     }
-  }, [userData]);
+  }, [isVisible]);
 
-  useEffect(() => {
-    const modal = new window.bootstrap.Modal(modalRef.current);
-    modal.show();
-
-    const handleHide = () => {
-      onClose?.();
-    };
-
-    const currentModalRef = modalRef.current;
-    currentModalRef.addEventListener('hidden.bs.modal', handleHide);
-
-    return () => {
-      if (currentModalRef) {
-        currentModalRef.removeEventListener('hidden.bs.modal', handleHide);
-      }
-      modal.hide();
-    };
-  }, [onClose]);
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    try {
-      // Preparar los datos con la fecha ajustada (+3 horas)
-      const dataToSend = {
-        ...formData,
-        birthdate: formData.birthdate ? addThreeHours(formData.birthdate) : ''
-      };
-
-      const response = await updateTrigger({
-        method: "PUT",
-        body: dataToSend,
-        headers: { "Authorization": userData.token }
-      });
-
-      if (response) {
-        setUpdateMessage('Perfil actualizado exitosamente');
-
-        setTimeout(() => {
-          // Actualizar con la fecha ajustada
-          const updatedUser = {
-            ...userData,
-            ...dataToSend,
-            token: userData.token // Mantener el token
-          };
-          onUpdate(updatedUser);
-          const modal = window.bootstrap.Modal.getInstance(modalRef.current);
-          modal.hide();
-        }, 2000);
-      }
-    } catch (error) {
-      setUpdateMessage('Error al actualizar el perfil');
-      console.error('Error updating profile:', error);
+    if (!email.trim()) {
+      setError('Por favor ingresa un email válido');
+      return;
     }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Por favor ingresa un formato de email válido');
+      return;
+    }
+
+    setError('');
+    onEmailSubmit(email.trim());
   };
+
+  if (!isVisible) return null;
 
   return (
     <div
       className="modal fade"
-      id={id}
       tabIndex="-1"
-      aria-labelledby={`${id}Label`}
       aria-hidden="true"
       ref={modalRef}
+      style={{ background: 'transparent' }} // Fondo transparente
     >
       <div className="modal-dialog modal-dialog-centered">
         <div className="modal-content">
-          <div className="modal-header bg-success text-white">
-            <h5 className="modal-title" id={`${id}Label`}>{title}</h5>
-            <button
-              type="button"
-              className="btn-close btn-close-white"
-              data-bs-dismiss="modal"
-              aria-label="Close"
-            />
+          <div className="modal-header bg-info text-white">
+            <h5 className="modal-title">Buscar Perfil</h5>
           </div>
           <div className="modal-body">
             <form onSubmit={handleSubmit}>
-              <div className="row g-3">
-                <div className="col-md-6">
-                  <label htmlFor="name" className="form-label text-success fw-bold">
-                    <i className="fas fa-user me-2"></i>Nombre
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control border-success"
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-
-                <div className="col-md-6">
-                  <label htmlFor="last_name" className="form-label text-success fw-bold">
-                    <i className="fas fa-user me-2"></i>Apellido
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control border-success"
-                    id="last_name"
-                    name="last_name"
-                    value={formData.last_name}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-
-                <div className="col-12">
-                  <label htmlFor="phone" className="form-label text-success fw-bold">
-                    <i className="fas fa-phone me-2"></i>Teléfono
-                  </label>
-                  <input
-                    type="tel"
-                    className="form-control border-success"
-                    id="phone"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    placeholder="Ej: +54 9 11 1234-5678"
-                  />
-                </div>
-
-                <div className="col-12">
-                  <label htmlFor="image" className="form-label text-success fw-bold">
-                    <i className="fas fa-image me-2"></i>URL de Foto de Perfil
-                  </label>
-                  <input
-                    type="url"
-                    className="form-control border-success"
-                    id="image"
-                    name="image"
-                    value={formData.image}
-                    onChange={handleInputChange}
-                    placeholder="https://ejemplo.com/mi-foto.jpg"
-                  />
-                  <div className="form-text">Ingresa la URL de tu foto de perfil</div>
-                </div>
-
-                <div className="col-12">
-                  <label htmlFor="birthdate" className="form-label text-success fw-bold">
-                    <i className="fas fa-birthday-cake me-2"></i>Fecha de Cumpleaños
-                  </label>
-                  <input
-                    type="date"
-                    className="form-control border-success"
-                    id="birthdate"
-                    name="birthdate"
-                    value={formData.birthdate}
-                    onChange={handleInputChange}
-                  />
-                </div>
+              <div className="mb-3">
+                <label htmlFor="email" className="form-label text-info fw-bold">
+                  <i className="fas fa-envelope me-2"></i>Correo Electrónico del Perfil
+                </label>
+                <input
+                  type="email"
+                  className="form-control border-info"
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="ejemplo@correo.com"
+                  autoFocus
+                  required
+                />
+                <div className="form-text">Ingresa el email del perfil que deseas ver</div>
               </div>
 
-              {updateMessage && (
-                <div className={`alert ${updateMessage.includes('Error') ? 'alert-danger' : 'alert-success'} mt-3`}>
-                  {updateMessage}
+              {error && (
+                <div className="alert alert-danger">
+                  {error}
                 </div>
               )}
 
               <div className="modal-footer border-0 px-0 pb-0">
                 <button
-                  type="button"
-                  className="btn btn-secondary"
-                  data-bs-dismiss="modal"
-                >
-                  Cancelar
-                </button>
-                <button
                   type="submit"
-                  className="btn btn-success fw-bold"
+                  className="btn btn-info fw-bold w-100"
                 >
-                  <i className="fas fa-save me-2"></i>Guardar Cambios
+                  <i className="fas fa-search me-2"></i>Buscar Perfil
                 </button>
               </div>
             </form>
@@ -248,195 +98,365 @@ const EditProfileModal = ({
 
 export default function Profile() {
   const navigateTo = useNavigate();
-  const { save, remove } = useStore();
+  const { email: urlEmail } = useParams();
   const [userData, setUserData] = useState(null);
-  const [appointments, setAppointments] = useState(null);
-  const [showModal, setShowModal] = useState(false);
+  const [products, setProducts] = useState(null);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [showErrorMessage, setShowErrorMessage] = useState(false);
 
-  // Fech del usuario
+  // Fetch del usuario por email con sus productos guardados
   const { trigger, isMutating, error } = useFetchData('/api/findUsers');
-  useEffect(() => {
-    const storedUser = JSON.parse(localStorage.getItem('currentUser'));
-    const fetchUserData = async () => {
-      try {
-        const response = await trigger({
-          method: 'POST',
-          body: [{ $match: { _id: { "$eq": storedUser._id } } }],
-          headers: { "Authorization": storedUser.token }
-        });
 
-        // Verificar que la respuesta tenga la estructura correcta
-        if (response && response.items && response.items.length > 0) {
-          const backendUserData = response.items[0];
-
-          // Combinar datos del backend con token del localStorage
-          const completeUserData = {
-            ...backendUserData,
-            token: storedUser.token // Preservar el token de autenticación
-          };
-
-          setUserData(completeUserData);
-
-          // Actualizar localStorage con los datos frescos del backend
-          localStorage.setItem('currentUser', JSON.stringify(completeUserData));
-
-          // Actualizar useStore con los datos frescos
-          save({ currentUser: completeUserData });
-        } else {
-          throw new Error('No se encontraron datos del usuario en el servidor');
-        }
-      } catch (err) {
-        console.error('Error fetching user data:', err);
-      }
-    };
-
-    fetchUserData();
-  }, [trigger, save]);
-
-  //fetch de los turnos
-  const {
-    trigger: getAppointment,
-    isMutating: isMutatingAppointment,
-    error: errorInAppointment
-  } = useFetchData('/api/findRelations');
-  useEffect(() => {
-    const storedUser = JSON.parse(localStorage.getItem('currentUser'));
-    const fetch = async () => {
-      try {
-        const res = await getAppointment({
-          method: 'POST',
-          body: appointmentQuery,
-          headers: { "Authorization": storedUser.token }
-        });
-        setAppointments(res);
-      } catch (err) {
-        console.error('Error fetching user data:', err);
-      }
-    };
-    fetch();
-  }, [getAppointment, save]);
-
-  const handleUpdateUser = async (updatedData) => {
+  // Función para buscar usuario por email con sus productos
+  const fetchUserByEmail = async (email) => {
     try {
-      // Cerrar el modal primero
-      setShowModal(false);
+      setSearchError('');
+      const userQuery = [
+        {
+          "$match": {
+            "email": { "$eq": email }
+          }
+        },
+        {
+          "$addFields": {
+            "strId": {
+              "$toString": "$_id"
+            }
+          }
+        },
+        {
+          "$lookup": {
+            "from": "relations",
+            "localField": "strId",
+            "foreignField": "from",
+            "as": "saved_product",
+            "pipeline": [
+              {
+                "$match": {
+                  "type": "saved_product"
+                }
+              },
+              {
+                "$addFields": {
+                  "objTo": {
+                    "$toObjectId": "$to"
+                  }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "objects",
+                  "localField": "objTo",
+                  "foreignField": "_id",
+                  "as": "product",
+                  "pipeline": [
+                    {
+                      "$lookup": {
+                        "from": "objecttypes",
+                        "localField": "type",
+                        "foreignField": "_id",
+                        "as": "object_type"
+                      }
+                    },
+                    {
+                      "$unwind": "$object_type"
+                    },
+                    {
+                      "$project": {
+                        "name": 1,
+                        "description": 1,
+                        "type": 1,
+                        "tags": 1,
+                        "category": "$object_type.name",
+                        "props": 1,
+                        "published": "$updatedAt",
+                        "createdAt": 1,
+                        "status": 1,
+                        "image": 1,
+                        "price": 1,
+                        "stock": 1,
+                        "sku": 1,
+                        "specifications": 1,
+                        "object_type": "$object_type"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "$unwind": "$product"
+              },
+              {
+                "$project": {
+                  "props": 1,
+                  "product": 1
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$project": {
+            "email": 1,
+            "name": 1,
+            "last_name": 1,
+            "image": 1,
+            "phone": 1,
+            "birthdate": 1,
+            "saved_product": 1
+          }
+        }
+      ];
 
-      // Actualizar estado local inmediatamente
-      setUserData(updatedData);
+      const response = await trigger({
+        method: 'POST',
+        body: userQuery
+      });
 
-      // Actualizar localStorage manteniendo la estructura completa
-      localStorage.setItem('currentUser', JSON.stringify(updatedData));
-
-      // Actualizar useStore
-      save({ currentUser: updatedData });
-
+      if (response && response.items && response.items.length > 0) {
+        const foundUser = response.items[0];
+        
+        // Verificar si el usuario tiene productos guardados
+        if (!foundUser.saved_product || foundUser.saved_product.length === 0) {
+          setSearchError('El usuario no tiene productos guardados');
+          setShowEmailModal(false);
+          setShowErrorMessage(true);
+          
+          // Después de 4 segundos, ocultar el mensaje de error y mostrar el modal nuevamente
+          setTimeout(() => {
+            setShowErrorMessage(false);
+            setSearchError('');
+            setShowEmailModal(true);
+          }, 4000);
+          return;
+        }
+        
+        setUserData(foundUser);
+        setShowEmailModal(false);
+        
+        // Actualizar URL con el email
+        if (urlEmail !== email) {
+          navigateTo(`/profile/${encodeURIComponent(email)}`, { replace: true });
+        }
+        
+        // Procesar productos del usuario
+        const userProducts = foundUser.saved_product.map(item => ({
+          ...item.product,
+          // Mantener información adicional si es necesaria
+          profit_props: item.props
+        }));
+        
+        setProducts({ items: userProducts });
+      } else {
+        setSearchError('No se encontró ningún usuario con ese email');
+        setShowEmailModal(false);
+        setShowErrorMessage(true);
+        
+        // Después de 4 segundos, ocultar el mensaje de error y mostrar el modal nuevamente
+        setTimeout(() => {
+          setShowErrorMessage(false);
+          setSearchError('');
+          setShowEmailModal(true);
+        }, 4000);
+      }
     } catch (err) {
-      console.error('Error updating user data:', err);
+      console.error('Error fetching user data:', err);
+      setSearchError('Error al buscar el usuario. Por favor intenta nuevamente.');
+      setShowEmailModal(false);
+      setShowErrorMessage(true);
+      
+      // Después de 4 segundos, ocultar el mensaje de error y mostrar el modal nuevamente
+      setTimeout(() => {
+        setShowErrorMessage(false);
+        setSearchError('');
+        setShowEmailModal(true);
+      }, 4000);
     }
   };
 
-  const handleLogout = () => {
-    remove("currentUser")
-    localStorage.removeItem("currentUser");
-    navigateTo('/login');
-  }
+  // Manejar envío de email desde el modal
+  const handleEmailSubmit = (email) => {
+    fetchUserByEmail(email);
+  };
+
+  // Efecto inicial
+  useEffect(() => {
+    if (urlEmail) {
+      // Si hay email en la URL, buscar directamente
+      fetchUserByEmail(decodeURIComponent(urlEmail));
+    } else {
+      // Si no hay email en la URL, mostrar modal
+      setShowEmailModal(true);
+    }
+  }, [urlEmail]);
+
+  // Función para buscar otro perfil
+  const handleSearchAnotherProfile = () => {
+    setUserData(null);
+    setProducts(null);
+    setSearchError('');
+    setShowErrorMessage(false);
+    setShowEmailModal(true);
+  };
 
   if (isMutating) return <Loader context={{ image }} />
-  if (error) return <Error backgroundImage={image} />
+  if (error && !userData) return <Error backgroundImage={image} />
+  
   if (userData) {
     return (
-      <div className="min-vh-100 pb-2 px-2 bg-home-img" id="services">
-        <div className="container">
-          <div className="row m-0 justify-content-center mb-2">
-            <div className="col-12 p-0">
-              {/* Tarjeta de Perfil que ocupa todo el ancho del container */}
-              <div className="card shadow-sm border-0 w-100">
-                <div className="card-body p-4">
-                  <div className="row">
-                    {/* Columna Izquierda - Foto de Perfil */}
-                    <div className="col-12 col-md-4 col-lg-3 text-center d-flex align-items-center justify-content-center mb-3">
-                      {/* Imagen de fondo por defecto */}
-                      <img
-                        src={userData.image || "https://t3.ftcdn.net/jpg/00/64/67/80/360_F_64678017_zUpiZFjj04cnLri7oADnyMH0XBYyQghG.jpg"}
-                        alt="Foto de perfil"
-                        className="rounded-circle border border-success border-3"
-                        style={{ width: '150px', height: '150px', objectFit: 'cover' }}
-                      />
-                    </div>
-                    {/* Columna Derecha - Información del Usuario */}
-                    <div className="col-12 col-md-8 col-lg-9">
-                      <div className="row g-3">
-                        {/* Nombre completo - ahora en la primera fila */}
-                        <div className="col-12">
-                          <div className="shadow-sm bg-light p-3 rounded border-start border-success border-4">
-                            <h3 className="text-success fw-bold mb-0">{userData.name} {userData.last_name}</h3>
+      <div 
+        className="position-relative"
+        style={{
+          height: '100vh',
+          backgroundImage: `url(${image})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'fixed'
+        }}
+      >
+        {/* Contenedor con scroll */}
+        <div 
+          className="h-100 overflow-auto"
+          style={{
+            paddingTop: '20px',
+            paddingBottom: '20px',
+            paddingLeft: '8px',
+            paddingRight: '8px',
+            scrollBehavior: 'smooth'
+          }}
+        >
+          <div className="container">
+            <div className="row m-0 justify-content-center mb-2">
+              <div className="col-12 p-0">
+                {/* Botón para buscar otro perfil */}
+                <div className="mb-3 text-end">
+                  <button 
+                    className="btn btn-outline-info"
+                    onClick={handleSearchAnotherProfile}
+                  >
+                    <i className="fas fa-search me-2"></i>Buscar Otro Perfil
+                  </button>
+                </div>
+
+                {/* Tarjeta de Perfil */}
+                <div className="card shadow-sm border-0 w-100">
+                  <div className="card-body p-4">
+                    <div className="row">
+                      {/* Columna Izquierda - Foto de Perfil */}
+                      <div className="col-12 col-md-4 col-lg-3 text-center d-flex align-items-center justify-content-center mb-3">
+                        <img
+                          src={userData.image || "https://t3.ftcdn.net/jpg/00/64/67/80/360_F_64678017_zUpiZFjj04cnLri7oADnyMH0XBYyQghG.jpg"}
+                          alt="Foto de perfil"
+                          className="rounded-circle border border-info border-3"
+                          style={{ width: '150px', height: '150px', objectFit: 'cover' }}
+                        />
+                      </div>
+                      
+                      {/* Columna Derecha - Información del Usuario */}
+                      <div className="col-12 col-md-8 col-lg-9">
+                        <div className="row g-3">
+                          {/* Nombre completo */}
+                          <div className="col-12">
+                            <div className="shadow-sm bg-light p-3 rounded border-start border-info border-4">
+                              <h3 className="text-info fw-bold mb-0">{userData.name} {userData.last_name}</h3>
+                            </div>
+                          </div>
+
+                          {/* Información del usuario */}
+                          <div className="col-12 col-lg-6">
+                            <div className="shadow-sm bg-light p-2 rounded border-start border-info border-4">
+                              <h6 className="text-info fw-bold mb-1" style={{ fontSize: '0.9rem' }}>
+                                <i className="fas fa-calendar-alt me-2"></i>Fecha de Nacimiento
+                              </h6>
+                              <p className="mb-0 text-muted ps-2" style={{ fontSize: '0.95rem' }}>
+                                {userData.birthdate
+                                  ? new Date(userData.birthdate).toLocaleDateString('es-ES', {
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit'
+                                  }).replace(/\//g, '/')
+                                  : 'No especificada'
+                                }
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="col-12 col-lg-6">
+                            <div className="shadow-sm bg-light p-2 rounded border-start border-info border-4">
+                              <h6 className="text-info fw-bold mb-1" style={{ fontSize: '0.9rem' }}>
+                                <i className="fas fa-envelope me-2"></i>Correo Electrónico
+                              </h6>
+                              <p className="mb-0 text-muted ps-2" style={{ fontSize: '0.95rem' }}>{userData.email}</p>
+                            </div>
+                          </div>
+
+                          <div className="col-12 col-lg-6">
+                            <div className="shadow-sm bg-light p-2 rounded border-start border-info border-4">
+                              <h6 className="text-info fw-bold mb-1" style={{ fontSize: '0.9rem' }}>
+                                <i className="fas fa-phone me-2"></i>Número de Teléfono
+                              </h6>
+                              <p className="mb-0 text-muted ps-2" style={{ fontSize: '0.95rem' }}>{userData.phone || 'No especificado'}</p>
+                            </div>
                           </div>
                         </div>
-
-                        {/* Primera fila de información */}
-                        <div className="col-12 col-lg-6">
-                          <div className="shadow-sm bg-light p-2 rounded border-start border-success border-4">
-                            <h6 className="text-success fw-bold mb-1" style={{ fontSize: '0.9rem' }}>
-                              <i className="fas fa-calendar-alt me-2"></i>Fecha de Nacimiento
-                            </h6>
-                            <p className="mb-0 text-muted ps-2" style={{ fontSize: '0.95rem' }}>
-                              {userData.birthdate
-                                ? new Date(userData.birthdate).toLocaleDateString('es-ES', {
-                                  year: 'numeric',
-                                  month: '2-digit',
-                                  day: '2-digit'
-                                }).replace(/\//g, '/')
-                                : 'No especificada'
-                              }
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Segunda fila de información */}
-                        <div className="col-12 col-lg-6">
-                          <div className="shadow-sm bg-light p-2 rounded border-start border-success border-4">
-                            <h6 className="text-success fw-bold mb-1" style={{ fontSize: '0.9rem' }}>
-                              <i className="fas fa-envelope me-2"></i>Correo Electrónico
-                            </h6>
-                            <p className="mb-0 text-muted ps-2" style={{ fontSize: '0.95rem' }}>{userData.email}</p>
-                          </div>
-                        </div>
-
-                        {/* Tercera fila de información */}
-                        <div className="col-12 col-lg-6">
-                          <div className="shadow-sm bg-light p-2 rounded border-start border-success border-4">
-                            <h6 className="text-success fw-bold mb-1" style={{ fontSize: '0.9rem' }}>
-                              <i className="fas fa-phone me-2"></i>Número de Teléfono
-                            </h6>
-                            <p className="mb-0 text-muted ps-2" style={{ fontSize: '0.95rem' }}>{userData.phone || 'No especificado'}</p>
-                          </div>
-                        </div>
-
-                        <div className="col-12 col-lg-6 d-flex justify-content-between justify-content-lg-end align-items-end">
-                          <button className='btn btn-outline-success me-3' onClick={() => setShowModal(true)}>Editar perfil</button>
-                          <button className='btn btn-success' onClick={handleLogout}>Salir</button>
-                        </div>
-
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+            
+            {/* Lista de Productos */}
+            <div className="row m-0 justify-content-center mt-3">
+              <div className="col-12 p-0">
+                <ProductList 
+                  products={products} 
+                  error={null} 
+                  isMutating={false}
+                  userEmail={userData.email}
+                />
+              </div>
+            </div>
           </div>
-          <AppointmentList appointments={appointments} error={errorInAppointment} isMutating={isMutatingAppointment}/>
         </div>
-        {/* Modal de Edición */}
-        {showModal && (
-          <EditProfileModal
-            id="editProfileModal"
-            title="Editar Perfil"
-            userData={userData}
-            onClose={() => setShowModal(false)}
-            onUpdate={handleUpdateUser}
-          />
-        )}
+
+        {/* Modal para solicitar email */}
+        <EmailRequestModal 
+          onEmailSubmit={handleEmailSubmit}
+          isVisible={showEmailModal}
+        />
       </div>
     );
   }
+
+  // Mostrar modal si no hay datos de usuario
+  return (
+    <div 
+      className="vh-100 d-flex align-items-center justify-content-center position-relative"
+      style={{
+        backgroundImage: `url(${image})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'fixed'
+      }}
+    >
+      <EmailRequestModal 
+        onEmailSubmit={handleEmailSubmit}
+        isVisible={showEmailModal}
+      />
+      
+      {/* Mostrar mensaje de error por 4 segundos */}
+      {showErrorMessage && searchError && (
+        <div className="position-fixed top-50 start-50 translate-middle" style={{zIndex: 9999}}>
+          <div className="alert alert-danger text-center shadow-lg" role="alert">
+            <i className="fas fa-exclamation-triangle me-2"></i>
+            {searchError}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
